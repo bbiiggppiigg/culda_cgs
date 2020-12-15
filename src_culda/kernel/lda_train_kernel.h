@@ -1,10 +1,11 @@
+#include "hip/hip_runtime.h"
 #ifndef _LDA_TRAIN_KERNEL_H_
 #define _LDA_TRAIN_KERNEL_H_
 
 
-#include <curand.h>
-#include <curand_kernel.h>
-#include <cuda_fp16.h>
+#include <hiprand.h>
+#include <hiprand_kernel.h>
+#include <hip/hip_fp16.h>
 #include <unistd.h>
 
 
@@ -13,7 +14,7 @@
 
 
 
-__global__ void initRandState(curandState *state);
+__global__ void initRandState(hiprandState *state);
 
 
 __global__ void LDAKernelTrain(
@@ -36,12 +37,12 @@ __global__ void LDAKernelTrain(
     PHITYPE     *phiTopicWord,       //model, numWords*k
     int         *phiTopic,           //model, k
     half        *phiHead,            //model, numWords*k
-    curandState *randState,
+    hiprandState *randState,
     int          randStateSize,
     int          GPUid,
     double      *wordPerplexity,
     long long   *docRevIndices);
 
-double LDATrainPerplexity(Document &, cudaStream_t *streams = NULL);
+double LDATrainPerplexity(Document &, hipStream_t *streams = NULL);
 
 #endif

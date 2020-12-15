@@ -11,7 +11,7 @@
 #include <cstring>      // std::memset
 #include <fstream>
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 #include "model_theta.h"
 #include "vocab.h"
 
@@ -81,14 +81,14 @@ void ModelTheta::InitData(Document &doc)
         thetaChunkVec.push_back(tmpPtr);
     }
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 }
 
-void ModelTheta::UpdateThetaGPU(Document &doc, cudaStream_t *stream)
+void ModelTheta::UpdateThetaGPU(Document &doc, hipStream_t *stream)
 {
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
     
     if(stream != NULL){
         for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++)
@@ -98,8 +98,8 @@ void ModelTheta::UpdateThetaGPU(Document &doc, cudaStream_t *stream)
         for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++)
             thetaChunkVec[chunkId]->UpdateThetaGPU(doc);
     }
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 }
 
 void ModelTheta::toGPU()

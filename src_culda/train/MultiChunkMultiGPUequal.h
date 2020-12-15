@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #ifndef _MultiChunkMultiGPUequal_H_
 #define _MultiChunkMultiGPUequal_H_
 
@@ -7,7 +8,7 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
 {
 
     /* data preparation and transfer */
-    gpuErr(cudaPeekAtLastError());
+    gpuErr(hipPeekAtLastError());
     for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++){
         doc.docChunkVec[chunkId]->allocGPU(chunkId);
         doc.docChunkVec[chunkId]->toGPU();
@@ -20,8 +21,8 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
     for(int i = 0; i < doc.numChunks; i++)
         modelPhi.UpdatePhiGPU(doc, i);
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
         
     for(int i = 1;i < arg.numGPUs; i++){
         modelPhi.MasterGPUCollect(i);
@@ -34,8 +35,8 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
     modelPhi.validPhi(doc);
     modelPhi.UpdatePhiHead(arg.beta);
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     /* model theta */
     modelTheta.InitData(doc); //alloc GPU+CPU memory space.
@@ -43,29 +44,29 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
     modelTheta.toCPU();
     //modelTheta.validTheta(doc);
     
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
 
     /* prepare the randstate, used for random sampling. */
     
     
     int randStateSize = 256;
-    curandState *deviceRandState[MaxNumGPU];
+    hiprandState *deviceRandState[MaxNumGPU];
     for(int i = 0;i < arg.numGPUs;i++){
-        cudaSetDevice(i);
-        cudaMalloc(&deviceRandState[i], sizeof(curandState)*randStateSize);
-        initRandState<<<randStateSize/256, 256>>>(deviceRandState[i]);
+        hipSetDevice(i);
+        hipMalloc(&deviceRandState[i], sizeof(hiprandState)*randStateSize);
+        hipLaunchKernelGGL(initRandState, dim3(randStateSize/256), dim3(256), 0, 0, deviceRandState[i]);
     }
 
-    cudaStream_t mainStream[MaxNumGPU];
-    cudaStream_t branStream[MaxNumGPU];
+    hipStream_t mainStream[MaxNumGPU];
+    hipStream_t branStream[MaxNumGPU];
     pthreadArgTheta thetaArgs[MaxNumGPU];
     pthread_t threads[MaxNumGPU];
     for(int i = 0;i < arg.numGPUs;i++){
-        cudaSetDevice(i);    
-        cudaStreamCreate(&mainStream[i]);
-        cudaStreamCreate(&branStream[i]);
+        hipSetDevice(i);    
+        hipStreamCreate(&mainStream[i]);
+        hipStreamCreate(&branStream[i]);
 
         thetaArgs[i].mainStream = mainStream[i];
         thetaArgs[i].branStream = branStream[i];
@@ -76,8 +77,8 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
     
     
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     //launch kernels
     
@@ -94,13 +95,13 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
         
         for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++){
             
-            cudaSetDevice(chunkId);
+            hipSetDevice(chunkId);
 
-            cudaDeviceSynchronize();
-            gpuErr(cudaPeekAtLastError());
+            hipDeviceSynchronize();
+            gpuErr(hipPeekAtLastError());
 
-            //LDAKernelTrain<<<doc.numWords, TrainBlockSize, 0, mainStream[chunkId]>>>(
-            LDAKernelTrain<<<doc.docChunkVec[chunkId]->numSlots, TrainBlockSize, 0, mainStream[chunkId]>>>(
+            //hipLaunchKernelGGL(LDAKernelTrain, dim3(doc.numWords), dim3(TrainBlockSize), 0, mainStream[chunkId], 
+            hipLaunchKernelGGL(LDAKernelTrain, dim3(doc.docChunkVec[chunkId]->numSlots), dim3(TrainBlockSize), 0, mainStream[chunkId], 
                 arg.k,
                 arg.alpha,
                 arg.beta,
@@ -144,12 +145,12 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
 
         
         for(int i = 1;i < arg.numGPUs; i++){ 
-            cudaStreamSynchronize(mainStream[i]);
+            hipStreamSynchronize(mainStream[i]);
             modelPhi.MasterGPUCollect(i, mainStream[0]);
             modelPhi.MasterGPUReduce(mainStream[0]);
         }
 
-        cudaStreamSynchronize(mainStream[0]);
+        hipStreamSynchronize(mainStream[0]);
 
         for(int i = 1;i < arg.numGPUs; i++) 
             modelPhi.MasterGPUDistribute(i, mainStream[i]);
@@ -159,7 +160,7 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
         for(int i = 0;i < arg.numGPUs;i++)
             pthread_join(threads[i], NULL);
 
-        cudaDeviceSynchronize();
+        hipDeviceSynchronize();
 
         clock_gettime(CLOCK_MONOTONIC, &end);
         stamp = end.tv_sec - begin.tv_sec;
@@ -172,8 +173,8 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
     }
     
     /*
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
     
     
     for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++)
@@ -185,9 +186,9 @@ void static MultiChunkMultiGPUequal(Document &doc, Vocabulary &vocab, Argument &
     //modelPhi.MasterGPUToCPU();
     //modelPhi.validPhi(doc);
     
-    for(int i = 0;i < arg.numChunks; i++)cudaFree(deviceRandState[i]);
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    for(int i = 0;i < arg.numChunks; i++)hipFree(deviceRandState[i]);
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
     */
 }
 

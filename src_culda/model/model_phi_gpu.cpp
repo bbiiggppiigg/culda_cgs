@@ -9,7 +9,7 @@
 #include <cstring>      // std::memset
 #include <fstream>
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 #include "model_phi_gpu.h"
 #include "vocab.h"
 
@@ -52,15 +52,15 @@ ModelPhiGPU::ModelPhiGPU(
 
 void ModelPhiGPU::allocGPU()
 {
-    cudaSetDevice(GPUid);
-    cudaMalloc((void**)&devicePhiTopicWordShort, sizeof(PHITYPE)*k*numWords);
-    cudaMalloc((void**)&devicePhiTopicWordSub,   sizeof(int)*k*UpdateNumWorkers);
-    cudaMalloc((void**)&devicePhiTopic,          sizeof(int)*k);
-    cudaMalloc((void**)&devicePhiHead,           sizeof(half)*k*numWords);
+    hipSetDevice(GPUid);
+    hipMalloc((void**)&devicePhiTopicWordShort, sizeof(PHITYPE)*k*numWords);
+    hipMalloc((void**)&devicePhiTopicWordSub,   sizeof(int)*k*UpdateNumWorkers);
+    hipMalloc((void**)&devicePhiTopic,          sizeof(int)*k);
+    hipMalloc((void**)&devicePhiHead,           sizeof(half)*k*numWords);
 
     if(GPUid == 0 && numGPUs > 1){
-        cudaMalloc((void**)&devicePhiTopicWordShortCopy, sizeof(PHITYPE)*k*numWords);
-        cudaMalloc((void**)&devicePhiTopicCopy,          sizeof(int)*k);
+        hipMalloc((void**)&devicePhiTopicWordShortCopy, sizeof(PHITYPE)*k*numWords);
+        hipMalloc((void**)&devicePhiTopicCopy,          sizeof(int)*k);
     }
     long long totalByte = sizeof(PHITYPE)*k*numWords + 
                           sizeof(int)*k*UpdateNumWorkers + 
@@ -69,14 +69,14 @@ void ModelPhiGPU::allocGPU()
 
     printf("phi sizeof:%.3f GB\n", totalByte/(1024.0*1024.0*1024.0));
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 }
 
-void ModelPhiGPU::UpdatePhiGPU(Document &doc, int chunkId, cudaStream_t stream)
+void ModelPhiGPU::UpdatePhiGPU(Document &doc, int chunkId, hipStream_t stream)
 {
-    cudaSetDevice(GPUid);
-    cudaMemsetAsync(devicePhiTopic,          0, k*sizeof(int),            stream);
+    hipSetDevice(GPUid);
+    hipMemsetAsync(devicePhiTopic,          0, k*sizeof(int),            stream);
 
     LDAUpdatePhiAPI(
         k,
@@ -90,10 +90,10 @@ void ModelPhiGPU::UpdatePhiGPU(Document &doc, int chunkId, cudaStream_t stream)
     );    
 }
 
-void ModelPhiGPU::UpdatePhiHead(float beta, cudaStream_t stream)
+void ModelPhiGPU::UpdatePhiHead(float beta, hipStream_t stream)
 {
 
-    cudaSetDevice(GPUid);
+    hipSetDevice(GPUid);
     //printf("ModelPhiGPU::UpdatePhiHead() ... id:%d\n", GPUid);
     LDAComputePhiHeadAPI(
         k, 
@@ -108,10 +108,10 @@ void ModelPhiGPU::UpdatePhiHead(float beta, cudaStream_t stream)
 void ModelPhiGPU::clearPtr()
 {
     
-    if(devicePhiTopicWordShort != NULL) cudaFree(devicePhiTopicWordShort);
-    if(devicePhiTopicWordSub   != NULL) cudaFree(devicePhiTopicWordSub);
-    if(devicePhiTopic          != NULL) cudaFree(devicePhiTopic);
-    if(devicePhiHead           != NULL) cudaFree(devicePhiHead);
+    if(devicePhiTopicWordShort != NULL) hipFree(devicePhiTopicWordShort);
+    if(devicePhiTopicWordSub   != NULL) hipFree(devicePhiTopicWordSub);
+    if(devicePhiTopic          != NULL) hipFree(devicePhiTopic);
+    if(devicePhiHead           != NULL) hipFree(devicePhiHead);
 
     devicePhiTopicWordSub   = NULL;
     devicePhiTopicWordShort = NULL;

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include "lda_train_kernel.h"
 #include "lda_theta_kernel.h"
 
@@ -102,10 +103,10 @@ void LDAUpdateThetaAPI(
     int          *thetaMaxIA,
     short        *thetaJA,
     int          *denseTheta,
-    cudaStream_t stream
+    hipStream_t stream
     )
 {
-    LDAUpdateThetaKernel<<<(UpdateNumWorkers+1)/2,64,0,stream>>>(
+    hipLaunchKernelGGL(LDAUpdateThetaKernel, dim3((UpdateNumWorkers+1)/2), dim3(64), 0, stream, 
         k,
         numDocs,
         chunkNumDocs,

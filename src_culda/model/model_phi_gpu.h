@@ -6,7 +6,7 @@
 #include <queue>
 #include <set>
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 #include "culda_argument.h"
 #include "vocab.h"
 #include "doc.h"
@@ -37,8 +37,8 @@ public:
     ~ModelPhiGPU(){clearPtr();}
 
     void allocGPU();
-    void UpdatePhiGPU(Document &, int, cudaStream_t stream=0);
-    void UpdatePhiHead(float, cudaStream_t stream=0);
+    void UpdatePhiGPU(Document &, int, hipStream_t stream=0);
+    void UpdatePhiHead(float, hipStream_t stream=0);
 
     void clearPtr();
 };

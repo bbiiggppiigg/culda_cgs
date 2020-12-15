@@ -9,7 +9,7 @@
 #include <queue>
 #include <set>
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 
 
 const int SCacheSize       = 64;
@@ -38,11 +38,11 @@ typedef int TokenIdxType;
 using namespace std;
 
 #define gpuErr(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+inline void gpuAssert(hipError_t code, const char *file, int line, bool abort=true)
 {
-   if (code != cudaSuccess) 
+   if (code != hipSuccess) 
    {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      fprintf(stderr,"GPUassert: %s %s %d\n", hipGetErrorString(code), file, line);
       if (abort) exit(code);
    }
 }

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 
 #include <stdio.h>
 
@@ -53,11 +54,11 @@ void LDAComputePhiHeadAPI(
     PHITYPE   *phiTopicWordShort,
     int       *phiTopic,
     half      *phiHead,
-    cudaStream_t stream)
+    hipStream_t stream)
 {
 
     //printf("call LDAComputePhiHeadAPI ...\n");
-    LDAcomputePhiHeadKernel<<<(numWords+3)/4,128,0, stream>>>(
+    hipLaunchKernelGGL(LDAcomputePhiHeadKernel, dim3((numWords+3)/4), dim3(128), 0, stream, 
         k, 
         beta, 
         numWords, 
@@ -68,7 +69,7 @@ void LDAComputePhiHeadAPI(
     );
 
     //printf("LDAcheckPhiHeadKernel ...\n");
-    //LDAcheckPhiHeadKernel<<<numWords,1024>>>(k, numWords, phiHead);
+    //hipLaunchKernelGGL(LDAcheckPhiHeadKernel, dim3(numWords), dim3(1024), 0, 0, k, numWords, phiHead);
 }
 
 /* phi update kernels */
@@ -141,10 +142,10 @@ void LDAUpdatePhiAPI(
     PHITYPE   *phiTopicWordShort,
     int       *phiTopicWordSub,
     int       *phiTopic,
-    cudaStream_t stream)
+    hipStream_t stream)
 {
 
-    LDAUpdatePhiKernel<<<(UpdateNumWorkers+3)/4, 128, 0,stream>>>(
+    hipLaunchKernelGGL(LDAUpdatePhiKernel, dim3((UpdateNumWorkers+3)/4), dim3(128), 0, stream, 
         k,
         numWords,
         wordIndices,
@@ -155,7 +156,7 @@ void LDAUpdatePhiAPI(
         UpdateNumWorkers
     );
 
-    //LDAPhiCheckKernel<<<(k*numWords + 127)/128, 128,0, stream>>>(k,numWords,phiTopicWordShort);
+    //hipLaunchKernelGGL(LDAPhiCheckKernel, dim3((k*numWords + 127)/128), dim3(128), 0, stream, k,numWords,phiTopicWordShort);
 }
 
 /* MultiGPU Reduce Kernels */
@@ -189,17 +190,17 @@ void LDAUpdatePhiReduceAPI(
     PHITYPE      *phiTopicWordShortCopy,
     int          *phiTopic,
     int          *phiTopicCopy,
-    cudaStream_t  stream)
+    hipStream_t  stream)
 {
 
-    LDAUpdatePhiReduceKernelShort<<<(k*numWords + 127)/128,128,0,stream>>>(
+    hipLaunchKernelGGL(LDAUpdatePhiReduceKernelShort, dim3((k*numWords + 127)/128), dim3(128), 0, stream, 
         k,
         numWords,
         phiTopicWordShort,
         phiTopicWordShortCopy
     );
 
-    LDAUpdatePhiReduceKernelInt<<<(k + 127)/128,128,0,stream>>>(
+    hipLaunchKernelGGL(LDAUpdatePhiReduceKernelInt, dim3((k + 127)/128), dim3(128), 0, stream, 
         k,
         numWords,
         phiTopic,

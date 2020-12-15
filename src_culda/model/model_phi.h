@@ -8,7 +8,7 @@
 #include <queue>
 #include <set>
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 #include "culda_argument.h"
 #include "vocab.h"
 #include "doc.h"
@@ -38,17 +38,17 @@ public:
     ModelPhi(int argK, int argGPU, int argDocs, int argWords, int numChunks);
         
     void InitData(Document&); 
-    void UpdatePhiGPU(Document&, int chunkId, cudaStream_t s=0);
-    void UpdatePhiHead(float beta,cudaStream_t *stream=NULL);
+    void UpdatePhiGPU(Document&, int chunkId, hipStream_t s=0);
+    void UpdatePhiHead(float beta,hipStream_t *stream=NULL);
 
     void clearPtr();
 
     ~ModelPhi(){ clearPtr();}
 
-    void MasterGPUCollect(int GPUid, cudaStream_t stream=0);
-    void MasterGPUDistribute(int GPUid, cudaStream_t stream=0);
-    void MasterGPUToCPU(cudaStream_t stream=0);
-    void MasterGPUReduce(cudaStream_t stream=0);
+    void MasterGPUCollect(int GPUid, hipStream_t stream=0);
+    void MasterGPUDistribute(int GPUid, hipStream_t stream=0);
+    void MasterGPUToCPU(hipStream_t stream=0);
+    void MasterGPUReduce(hipStream_t stream=0);
     
     void reduceCPU();
 

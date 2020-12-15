@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #ifndef _LDA_PHI_KERNEL_H_
 #define _LDA_PHI_KERNEL_H_
 
@@ -29,7 +30,7 @@ void LDAComputePhiHeadAPI(
     PHITYPE   *phiTopicWordShort,
     int       *phiTopic,
     half      *phiHead,
-    cudaStream_t stream=0
+    hipStream_t stream=0
 );
 
 /* phi update kernels */
@@ -52,7 +53,7 @@ void LDAUpdatePhiAPI(
     PHITYPE     *phiTopicWordShort,
     int         *phiTopicWordSub,
     int         *phiTopic,
-    cudaStream_t stream=0
+    hipStream_t stream=0
 );
 
 /*
@@ -84,7 +85,7 @@ void LDAUpdatePhiReduceAPI(
     PHITYPE      *phiTopicWordShortCopy,
     int          *phiTopic,
     int          *phiTopicCopy,
-    cudaStream_t stream=0
+    hipStream_t stream=0
 );
 
 #endif

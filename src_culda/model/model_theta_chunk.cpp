@@ -79,13 +79,13 @@ void ModelThetaChunk::InitData(const vector<int> &docLenVec)
     for(int docId = docIdEnd; docId <= numDocs ;docId ++)
         hostThetaMaxIA[docId] = offset;
 
-    cudaSetDevice(chunkId);
+    hipSetDevice(chunkId);
     //GPU side
-    cudaMalloc((void**)&deviceThetaA,     sizeof(short)*chunkNNZ);
-    cudaMalloc((void**)&deviceThetaJA,    sizeof(short)*chunkNNZ);   
-    cudaMalloc((void**)&deviceThetaMaxIA, sizeof(int)*(numDocs + 1));
-    cudaMalloc((void**)&deviceThetaCurIA, sizeof(int)*numDocs);
-    cudaMalloc((void**)&deviceDenseTheta, sizeof(int)*UpdateNumWorkers*k);
+    hipMalloc((void**)&deviceThetaA,     sizeof(short)*chunkNNZ);
+    hipMalloc((void**)&deviceThetaJA,    sizeof(short)*chunkNNZ);   
+    hipMalloc((void**)&deviceThetaMaxIA, sizeof(int)*(numDocs + 1));
+    hipMalloc((void**)&deviceThetaCurIA, sizeof(int)*numDocs);
+    hipMalloc((void**)&deviceDenseTheta, sizeof(int)*UpdateNumWorkers*k);
 
     long long totalByte = sizeof(short)*chunkNNZ +
                           sizeof(short)*chunkNNZ +
@@ -96,25 +96,25 @@ void ModelThetaChunk::InitData(const vector<int> &docLenVec)
 
     //exit(0);
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     //transfer MaxIA
     toGPU();
 }
 
-void ModelThetaChunk::UpdateThetaGPU(Document &doc, cudaStream_t stream)
+void ModelThetaChunk::UpdateThetaGPU(Document &doc, hipStream_t stream)
 {
     
-    cudaSetDevice(chunkId);
+    hipSetDevice(chunkId);
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
-    cudaMemsetAsync(deviceThetaA,  0, sizeof(short)*chunkNNZ, stream);
-    cudaMemsetAsync(deviceThetaJA, 0, sizeof(short)*chunkNNZ, stream);
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipMemsetAsync(deviceThetaA,  0, sizeof(short)*chunkNNZ, stream);
+    hipMemsetAsync(deviceThetaJA, 0, sizeof(short)*chunkNNZ, stream);
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     LDAUpdateThetaAPI(
         k,
@@ -135,8 +135,8 @@ void ModelThetaChunk::UpdateThetaGPU(Document &doc, cudaStream_t stream)
         stream
     );
     
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 }
 
 void ModelThetaChunk::validTheta(Document &doc)
@@ -276,11 +276,11 @@ void ModelThetaChunk::toGPU()
 {
     //printf("ModelThetaChunk(%d)::toGPU() ...\n", chunkId);
      
-    cudaMemcpy(deviceThetaMaxIA, 
+    hipMemcpy(deviceThetaMaxIA, 
                hostThetaMaxIA, 
                sizeof(int)*(numDocs + 1),  
-               cudaMemcpyHostToDevice);
-    //gpuErr(cudaPeekAtLastError());
+               hipMemcpyHostToDevice);
+    //gpuErr(hipPeekAtLastError());
 
     //printf("ModelThetaChunk::toGPU() finished ...\n\n");
 }
@@ -288,47 +288,47 @@ void ModelThetaChunk::toGPU()
 void ModelThetaChunk::toCPU()
 {
     //printf("ModelThetaChunk::thetaToCPU() ...\n");
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     //theta
-    cudaMemcpy(hostThetaA,
+    hipMemcpy(hostThetaA,
                deviceThetaA,
                sizeof(short)*chunkNNZ,
-               cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+               hipMemcpyDeviceToHost);
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
     
-    cudaMemcpy(hostThetaJA,
+    hipMemcpy(hostThetaJA,
                deviceThetaJA,
                sizeof(short)*chunkNNZ,
-               cudaMemcpyDeviceToHost);
+               hipMemcpyDeviceToHost);
 
-    cudaMemcpy(hostThetaMaxIA,
+    hipMemcpy(hostThetaMaxIA,
                deviceThetaMaxIA,
                sizeof(int)*(numDocs + 1),
-               cudaMemcpyDeviceToHost);
-    gpuErr(cudaPeekAtLastError());
+               hipMemcpyDeviceToHost);
+    gpuErr(hipPeekAtLastError());
 
-    cudaMemcpy(hostThetaCurIA,
+    hipMemcpy(hostThetaCurIA,
                deviceThetaCurIA,
                sizeof(int)*numDocs,
-               cudaMemcpyDeviceToHost);
-    gpuErr(cudaPeekAtLastError());
+               hipMemcpyDeviceToHost);
+    gpuErr(hipPeekAtLastError());
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
     //printf("ModelThetaChunk::thetaToCPU() finished ...\n");
 
 }
 
 void ModelThetaChunk::clearPtr()
 {
-    if(deviceThetaA     != NULL) cudaFree(deviceThetaA);
-    if(deviceThetaJA    != NULL) cudaFree(deviceThetaJA);
-    if(deviceThetaMaxIA != NULL) cudaFree(deviceThetaMaxIA);
-    if(deviceThetaCurIA != NULL) cudaFree(deviceThetaCurIA);
-    if(deviceDenseTheta != NULL) cudaFree(deviceDenseTheta);
+    if(deviceThetaA     != NULL) hipFree(deviceThetaA);
+    if(deviceThetaJA    != NULL) hipFree(deviceThetaJA);
+    if(deviceThetaMaxIA != NULL) hipFree(deviceThetaMaxIA);
+    if(deviceThetaCurIA != NULL) hipFree(deviceThetaCurIA);
+    if(deviceDenseTheta != NULL) hipFree(deviceDenseTheta);
     
     //CPU data release
     if(hostThetaA     != NULL) delete []hostThetaA;

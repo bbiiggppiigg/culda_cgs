@@ -2,10 +2,11 @@
 
 
 
-CXX = nvcc
-CUDA_INSTALL_PATH = /usr/local/cuda
+CXX = hipcc
+INCLUDE_PATH = /opt/rocm/include/hiprand -I /opt/rocm/rocrand
+LIB_PATH = /opt/rocm/
 OBJECTIVE = ./obj
-CXX_FLAG = -arch=sm_61 
+CXX_FLAG = -I /opt/rocm/include/hiprand -I /opt/rocm/rocrand/include
 #-maxrregcount=32
 
 #-maxrregcount=32
@@ -39,7 +40,7 @@ culda:$(OBJECTIVE)/main.o \
 	       $(OBJECTIVE)/lda_theta_kernel.o \
 	       $(OBJECTIVE)/lda_phi_kernel.o \
 	       -o culda \
-	       -L $(CUDA_INSTALL_PATH)/lib64 \
+	       -L $(LIB_PATH)/lib \
 	       $(CXX_FLAG) $(DEBUG_FLAG)
 
 
@@ -53,8 +54,8 @@ $(OBJECTIVE)/main.o:\
 	./train/lda_train.h 
 	$(CXX) -c main.cpp \
 	       -o $(OBJECTIVE)/main.o \
-	       -I $(CUDA_INSTALL_PATH)/include \
-	       -L $(CUDA_INSTALL_PATH)/lib64 \
+	       -I $(INCLUDE_PATH)/include \
+	       -L $(LIB_PATH)/lib \
 	       $(CXX_FLAG) $(DEBUG_FLAG)
 
 $(OBJECTIVE)/doc.o:\
@@ -81,24 +82,25 @@ $(OBJECTIVE)/vocab.o:\
 	       $(CXX_FLAG) $(DEBUG_FLAG)
 
 $(OBJECTIVE)/lda_theta_kernel.o:\
-	./kernel/lda_theta_kernel.cu \
+	./kernel/lda_theta_kernel.hip \
 	./kernel/lda_theta_kernel.h \
 	./kernel/lda_train_kernel.h \
 	./model/culda_argument.h
-	$(CXX) -c ./kernel/lda_theta_kernel.cu \
+	$(CXX) -c ./kernel/lda_theta_kernel.hip \
 	       -o $(OBJECTIVE)/lda_theta_kernel.o \
 	       $(CXX_FLAG) -Xptxas -v $(DEBUG_FLAG)
 
 $(OBJECTIVE)/lda_train_kernel.o:\
-	./kernel/lda_train_kernel.cu \
+	./kernel/lda_train_kernel.hip \
 	./kernel/lda_train_kernel.h \
 	./model/culda_argument.h
-	$(CXX) -c ./kernel/lda_train_kernel.cu \
+	$(CXX) -c ./kernel/lda_train_kernel.hip \
 	       -o $(OBJECTIVE)/lda_train_kernel.o \
+	       -I $(INCLUDE_PATH)/include \
 	       $(CXX_FLAG) -Xptxas -v $(DEBUG_FLAG)
 
 $(OBJECTIVE)/lda_train.o:\
-	./train/lda_train.cu \
+	./train/lda_train.hip \
 	./train/lda_train.h \
 	./train/MultiChunkMultiGPUequal.h \
 	./train/SingleChunkSingleGPU.h \
@@ -111,16 +113,16 @@ $(OBJECTIVE)/lda_train.o:\
 	./model/model_phi.h \
 	./model/model_phi_gpu.h\
 	./model/culda_argument.h
-	$(CXX) -c ./train/lda_train.cu \
+	$(CXX) -c ./train/lda_train.hip \
 	       -o $(OBJECTIVE)/lda_train.o \
 	       $(CXX_FLAG) $(DEBUG_FLAG)
 
 $(OBJECTIVE)/lda_phi_kernel.o:\
-	./kernel/lda_phi_kernel.cu \
+	./kernel/lda_phi_kernel.hip \
 	./kernel/lda_phi_kernel.h \
 	./kernel/lda_train_kernel.h \
 	./model/culda_argument.h
-	$(CXX) -c ./kernel/lda_phi_kernel.cu \
+	$(CXX) -c ./kernel/lda_phi_kernel.hip \
 	       -o $(OBJECTIVE)/lda_phi_kernel.o \
 	       $(CXX_FLAG) $(DEBUG_FLAG)
 

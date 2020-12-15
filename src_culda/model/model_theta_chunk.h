@@ -7,7 +7,7 @@
 #include <queue>
 #include <set>
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 #include "culda_argument.h"
 #include "vocab.h"
 #include "doc.h"
@@ -52,7 +52,7 @@ public:
     void InitData(const vector<int> &);
     void toGPU();
     void toCPU();
-    void UpdateThetaGPU(Document &, cudaStream_t stream=0);
+    void UpdateThetaGPU(Document &, hipStream_t stream=0);
     void validTheta(Document&);
 
     void clearPtr();

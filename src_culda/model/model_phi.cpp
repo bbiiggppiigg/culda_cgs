@@ -11,7 +11,7 @@
 #include <cstring>      // std::memset
 #include <fstream>
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 #include "model_phi.h"
 #include "vocab.h"
 
@@ -67,12 +67,12 @@ void ModelPhi::InitData(Document &doc)
     }
 }
 
-void ModelPhi::UpdatePhiGPU(Document &doc, int chunkId, cudaStream_t stream)
+void ModelPhi::UpdatePhiGPU(Document &doc, int chunkId, hipStream_t stream)
 {
     phiChunkVec[chunkId]->UpdatePhiGPU(doc, chunkId, stream);
 }
 
-void ModelPhi::UpdatePhiHead(float beta, cudaStream_t *stream)
+void ModelPhi::UpdatePhiHead(float beta, hipStream_t *stream)
 {
 
     if(stream != NULL){
@@ -85,54 +85,54 @@ void ModelPhi::UpdatePhiHead(float beta, cudaStream_t *stream)
     }
 }
 
-void ModelPhi::MasterGPUToCPU(cudaStream_t stream)
+void ModelPhi::MasterGPUToCPU(hipStream_t stream)
 {
 
     //phi
-    cudaMemcpyAsync(hostPhiTopicWordShort[0],
+    hipMemcpyAsync(hostPhiTopicWordShort[0],
                     phiChunkVec[0]->devicePhiTopicWordShort,
                     sizeof(PHITYPE)*k*numWords, 
-                    cudaMemcpyDeviceToHost,
+                    hipMemcpyDeviceToHost,
                     stream);
 
-    cudaMemcpyAsync(hostPhiTopic[0],
+    hipMemcpyAsync(hostPhiTopic[0],
                     phiChunkVec[0]->devicePhiTopic,
                     sizeof(int)*k, 
-                    cudaMemcpyDeviceToHost,
+                    hipMemcpyDeviceToHost,
                     stream);
 }
 
-void ModelPhi::MasterGPUCollect(int GPUid, cudaStream_t stream)
+void ModelPhi::MasterGPUCollect(int GPUid, hipStream_t stream)
 {
-    cudaMemcpyAsync(phiChunkVec[0]->devicePhiTopicWordShortCopy,
+    hipMemcpyAsync(phiChunkVec[0]->devicePhiTopicWordShortCopy,
                     phiChunkVec[GPUid]->devicePhiTopicWordShort,
                     sizeof(PHITYPE)*k*numWords,
-                    cudaMemcpyDeviceToDevice,
+                    hipMemcpyDeviceToDevice,
                     stream);
-    cudaMemcpyAsync(phiChunkVec[0]->devicePhiTopicCopy,
+    hipMemcpyAsync(phiChunkVec[0]->devicePhiTopicCopy,
                     phiChunkVec[GPUid]->devicePhiTopic,
                     sizeof(int)*k,
-                    cudaMemcpyDeviceToDevice,
+                    hipMemcpyDeviceToDevice,
                     stream);
 }
 
-void ModelPhi::MasterGPUDistribute(int GPUid, cudaStream_t stream)
+void ModelPhi::MasterGPUDistribute(int GPUid, hipStream_t stream)
 {
-    cudaMemcpyAsync(phiChunkVec[GPUid]->devicePhiTopicWordShort,
+    hipMemcpyAsync(phiChunkVec[GPUid]->devicePhiTopicWordShort,
                     phiChunkVec[0]->devicePhiTopicWordShort,
                     sizeof(PHITYPE)*k*numWords,
-                    cudaMemcpyDeviceToDevice,
+                    hipMemcpyDeviceToDevice,
                     stream);
-    cudaMemcpyAsync(phiChunkVec[GPUid]->devicePhiTopic,
+    hipMemcpyAsync(phiChunkVec[GPUid]->devicePhiTopic,
                     phiChunkVec[0]->devicePhiTopic,
                     sizeof(int)*k,
-                    cudaMemcpyDeviceToDevice,
+                    hipMemcpyDeviceToDevice,
                     stream);
 }
 
-void ModelPhi::MasterGPUReduce(cudaStream_t stream)
+void ModelPhi::MasterGPUReduce(hipStream_t stream)
 {
-    cudaSetDevice(0);
+    hipSetDevice(0);
     LDAUpdatePhiReduceAPI(
         k,
         numWords,

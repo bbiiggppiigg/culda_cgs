@@ -1,20 +1,21 @@
+#include "hip/hip_runtime.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
 
-#include <curand.h>
-#include <curand_kernel.h>
+#include <hiprand.h>
+#include <hiprand_kernel.h>
 
 #include "lda_train_kernel.h"
 #include "../model/culda_argument.h"
 
 using namespace std;
 
-__global__ void initRandState(curandState *state)
+__global__ void initRandState(hiprandState *state)
 {
     int tid = blockIdx.x*blockDim.x + threadIdx.x;
-    curand_init(clock() + tid, tid, 0,&state[tid]);
+    hiprand_init(clock() + tid, tid, 0,&state[tid]);
 }
 
 __global__ void LDAKernelTrain(
@@ -37,7 +38,7 @@ __global__ void LDAKernelTrain(
     PHITYPE     *phiTopicWord,       //model, numWords*k
     int         *phiTopic,           //model, k
     half        *phiHead,            //model, numWords*k
-    curandState *randState,
+    hiprandState *randState,
     int          randStateSize,
     int          GPUid,
     double      *wordPerplexity,     //numWords
@@ -138,10 +139,11 @@ __global__ void LDAKernelTrain(
 
         //randomly generate u.
         float u;
-        if(laneId == 0)u = curand_uniform(&(randState[workerId%randStateSize]));
+        if(laneId == 0)u = hiprand_uniform(&(randState[workerId%randStateSize]));
         u = __shfl(u, 0);
         int newZ  = 0;
 
+        unsigned tmp_vote;
         if(u < S/(S+Q)) 
         {
 
@@ -157,7 +159,8 @@ __global__ void LDAKernelTrain(
 
             int voteFlag = 0;
             if(transU < tmpSumHigh) voteFlag = 1;
-            int lvl1Idx = __ffs(__ballot(voteFlag)) - 1;
+            tmp_vote = __ballot(voteFlag);
+            int lvl1Idx = __ffs(tmp_vote) - 1;
             
             int overflowFlag = 0;
 
@@ -189,7 +192,9 @@ __global__ void LDAKernelTrain(
             
             voteFlag = 0;
             if(transU < tmpSum) voteFlag = 1;
-            int offset = __ffs(__ballot(voteFlag)) - 1;
+
+            tmp_vote = __ballot(voteFlag);
+            int offset = __ffs(tmp_vote) - 1;
 
             //int offset1 = offset;
             //offset = 31 - __clz(__ballot(colVal>0));
@@ -212,7 +217,9 @@ __global__ void LDAKernelTrain(
             //voting for lvl1Idx
             int voteFlag = 0;
             if(transU < tmpSumHigh) voteFlag = 1; //voteFlag = transU < tmpSumHigh;
-            int lvl1Idx = __ffs(__ballot(voteFlag)) - 1;
+
+            tmp_vote = __ballot(voteFlag);
+            int lvl1Idx = __ffs(tmp_vote) - 1;
             if(lvl1Idx < 0) lvl1Idx = 31;
 
             
@@ -243,7 +250,8 @@ __global__ void LDAKernelTrain(
             if(laneId == 0)tmpSumLow = 0;
             
             if( transU < tmpSumHigh)voteFlag = 1; //voteFlag = transU < tmpSumHigh;
-            int lvl2Idx = __ffs(__ballot(voteFlag)) - 1;  
+            tmp_vote = __ballot(voteFlag);
+            int lvl2Idx = __ffs(tmp_vote) - 1;  
 
             if(lvl2Idx < 0)lvl2Idx = 31;
 
@@ -320,7 +328,7 @@ __global__ void LDATrainPerplexityReduce2(double *perplexityMid)
     if(threadIdx.x == 0)perplexityMid[0] = sum;
 }
 
-double LDATrainPerplexity(Document &doc, cudaStream_t *streams)
+double LDATrainPerplexity(Document &doc, hipStream_t *streams)
 {
 
     double tmpSum[MaxNumGPU];
@@ -329,24 +337,24 @@ double LDATrainPerplexity(Document &doc, cudaStream_t *streams)
 
         for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++){
 
-            cudaSetDevice(chunkId);
+            hipSetDevice(chunkId);
         
             //reduce 1.
-            LDATrainPerplexityReduce1<<<ReduceParameter/2, 64, 0>>>(
+            hipLaunchKernelGGL(LDATrainPerplexityReduce1, dim3(ReduceParameter/2), dim3(64), 0, 0, 
                 doc.docChunkVec[chunkId]->deviceWordPerplexity,
                 doc.docChunkVec[chunkId]->deviceWordPerplexityMid,
                 doc.docChunkVec[chunkId]->numWords*(TrainBlockSize/32));
 
             double testMid[ReduceParameter];
-            cudaMemcpy(testMid, doc.docChunkVec[chunkId]->deviceWordPerplexityMid, sizeof(double)*ReduceParameter, cudaMemcpyDeviceToHost);
+            hipMemcpy(testMid, doc.docChunkVec[chunkId]->deviceWordPerplexityMid, sizeof(double)*ReduceParameter, hipMemcpyDeviceToHost);
 
-            //cudaDeviceSynchronize();
-            //gpuErr(cudaPeekAtLastError());
+            //hipDeviceSynchronize();
+            //gpuErr(hipPeekAtLastError());
 
             //reduce 2.
-            LDATrainPerplexityReduce2<<<1,32,0>>>(doc.docChunkVec[chunkId]->deviceWordPerplexityMid);
+            hipLaunchKernelGGL(LDATrainPerplexityReduce2, dim3(1), dim3(32), 0, 0, doc.docChunkVec[chunkId]->deviceWordPerplexityMid);
 
-            cudaMemcpy(tmpSum, doc.docChunkVec[chunkId]->deviceWordPerplexityMid, sizeof(double), cudaMemcpyDeviceToHost);
+            hipMemcpy(tmpSum, doc.docChunkVec[chunkId]->deviceWordPerplexityMid, sizeof(double), hipMemcpyDeviceToHost);
 
 
             sum += tmpSum[0];
@@ -359,23 +367,23 @@ double LDATrainPerplexity(Document &doc, cudaStream_t *streams)
 
         for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++)
         {
-            cudaSetDevice(chunkId);
+            hipSetDevice(chunkId);
             //reduce 1.
-            LDATrainPerplexityReduce1<<<ReduceParameter/2, 64, 0, streams[chunkId]>>>(
+            hipLaunchKernelGGL(LDATrainPerplexityReduce1, dim3(ReduceParameter/2), dim3(64), 0, streams[chunkId], 
                 doc.docChunkVec[chunkId]->deviceWordPerplexity,
                 doc.docChunkVec[chunkId]->deviceWordPerplexityMid,
                 doc.docChunkVec[chunkId]->numWords);
 
-            //cudaDeviceSynchronize();
-            //gpuErr(cudaPeekAtLastError());
+            //hipDeviceSynchronize();
+            //gpuErr(hipPeekAtLastError());
 
             //reduce 2.
-            LDATrainPerplexityReduce2<<<1,32,0, streams[chunkId]>>>(doc.docChunkVec[chunkId]->deviceWordPerplexityMid);
-            cudaMemcpyAsync(tmpSum + chunkId, doc.docChunkVec[chunkId]->deviceWordPerplexityMid, sizeof(double), cudaMemcpyDeviceToHost, streams[chunkId]);
+            hipLaunchKernelGGL(LDATrainPerplexityReduce2, dim3(1), dim3(32), 0, streams[chunkId], doc.docChunkVec[chunkId]->deviceWordPerplexityMid);
+            hipMemcpyAsync(tmpSum + chunkId, doc.docChunkVec[chunkId]->deviceWordPerplexityMid, sizeof(double), hipMemcpyDeviceToHost, streams[chunkId]);
         }
 
         for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++)
-            cudaStreamSynchronize(streams[chunkId]);
+            hipStreamSynchronize(streams[chunkId]);
 
         for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++)
             sum += tmpSum[chunkId];

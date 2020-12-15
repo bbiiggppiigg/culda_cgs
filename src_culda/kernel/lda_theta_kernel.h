@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #ifndef _LDA_THETA_KERNEL_H_
 #define _LDA_THETA_KERNEL_H_
 
@@ -38,7 +39,7 @@ void LDAUpdateThetaAPI(
     int          *thetaMaxIA,
     short        *thetaJA,
     int          *denseTheta,
-    cudaStream_t stream = 0
+    hipStream_t stream = 0
     );
 
 

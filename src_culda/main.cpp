@@ -12,7 +12,7 @@
 #include <vector>
 #include <time.h>
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 
 #include "./model/model_theta.h"
 #include "./model/culda_argument.h"
@@ -146,7 +146,7 @@ Argument ParseArgument(int argc, char **argv)
 
 	//GPU number
 	int deviceCount = 1;
-    cudaError_t error_id = cudaGetDeviceCount(&deviceCount);
+    hipError_t error_id = hipGetDeviceCount(&deviceCount);
 
     if(deviceCount >= MaxNumGPU)deviceCount = MaxNumGPU;
     

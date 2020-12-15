@@ -10,7 +10,7 @@
 #include <time.h>
 #include <sstream>
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 
 #include "culda_argument.h"
 
@@ -72,16 +72,16 @@ public:
         if(wordTopics              != NULL)delete []wordTopics;
         if(wordPerplexity          != NULL)delete []wordPerplexity;
         
-        if(deviceWordIndices       != NULL)cudaFree(deviceWordIndices);
-        if(deviceSlotIdToWordId    != NULL)cudaFree(deviceSlotIdToWordId);
-        if(deviceSlotIndices       != NULL)cudaFree(deviceSlotIndices);
-        if(deviceWordTokens        != NULL)cudaFree(deviceWordTokens);
-        if(deviceWordTopics        != NULL)cudaFree(deviceWordTokens);
-        if(deviceWordPerplexity    != NULL)cudaFree(deviceWordPerplexity);
-        if(deviceWordPerplexityMid != NULL)cudaFree(deviceWordPerplexityMid);
+        if(deviceWordIndices       != NULL)hipFree(deviceWordIndices);
+        if(deviceSlotIdToWordId    != NULL)hipFree(deviceSlotIdToWordId);
+        if(deviceSlotIndices       != NULL)hipFree(deviceSlotIndices);
+        if(deviceWordTokens        != NULL)hipFree(deviceWordTokens);
+        if(deviceWordTopics        != NULL)hipFree(deviceWordTokens);
+        if(deviceWordPerplexity    != NULL)hipFree(deviceWordPerplexity);
+        if(deviceWordPerplexityMid != NULL)hipFree(deviceWordPerplexityMid);
 
-        if(deviceDocRevIndices     != NULL)cudaFree(deviceDocRevIndices);
-        if(deviceDocRevIdx         != NULL)cudaFree(deviceDocRevIdx);
+        if(deviceDocRevIndices     != NULL)hipFree(deviceDocRevIndices);
+        if(deviceDocRevIdx         != NULL)hipFree(deviceDocRevIdx);
 
     }
 

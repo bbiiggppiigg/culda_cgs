@@ -276,33 +276,33 @@ struct wordStruct{
 
 void DocChunk::allocGPU(int GPUid)
 {
-    cudaSetDevice(GPUid);
+    hipSetDevice(GPUid);
     
-    if(deviceWordIndices       != NULL)cudaFree(deviceWordIndices);
-    if(deviceSlotIdToWordId    != NULL)cudaFree(deviceSlotIdToWordId);
-    if(deviceSlotIndices       != NULL)cudaFree(deviceSlotIndices);
-    if(deviceWordTokens        != NULL)cudaFree(deviceWordTokens);
-    if(deviceWordTopics        != NULL)cudaFree(deviceWordTopics);
-    if(deviceWordPerplexity    != NULL)cudaFree(deviceWordPerplexity);
-    if(deviceWordPerplexityMid != NULL)cudaFree(deviceWordPerplexityMid);
+    if(deviceWordIndices       != NULL)hipFree(deviceWordIndices);
+    if(deviceSlotIdToWordId    != NULL)hipFree(deviceSlotIdToWordId);
+    if(deviceSlotIndices       != NULL)hipFree(deviceSlotIndices);
+    if(deviceWordTokens        != NULL)hipFree(deviceWordTokens);
+    if(deviceWordTopics        != NULL)hipFree(deviceWordTopics);
+    if(deviceWordPerplexity    != NULL)hipFree(deviceWordPerplexity);
+    if(deviceWordPerplexityMid != NULL)hipFree(deviceWordPerplexityMid);
 
-    if(deviceDocRevIndices     != NULL)cudaFree(deviceDocRevIndices);
-    if(deviceDocRevIdx         != NULL)cudaFree(deviceDocRevIdx);
+    if(deviceDocRevIndices     != NULL)hipFree(deviceDocRevIndices);
+    if(deviceDocRevIdx         != NULL)hipFree(deviceDocRevIdx);
     
-    cudaMalloc((void**)&deviceWordIndices,       (numWords + 1)*sizeof(long long));
-    cudaMalloc((void**)&deviceSlotIdToWordId,    numSlots*sizeof(int));
-    cudaMalloc((void**)&deviceSlotIndices,       numSlots*2*sizeof(long long));
+    hipMalloc((void**)&deviceWordIndices,       (numWords + 1)*sizeof(long long));
+    hipMalloc((void**)&deviceSlotIdToWordId,    numSlots*sizeof(int));
+    hipMalloc((void**)&deviceSlotIndices,       numSlots*2*sizeof(long long));
 
-    cudaMalloc((void**)&deviceWordTokens,        chunkNumTokens*sizeof(int));
-    cudaMalloc((void**)&deviceWordTopics,        chunkNumTokens*sizeof(short));
+    hipMalloc((void**)&deviceWordTokens,        chunkNumTokens*sizeof(int));
+    hipMalloc((void**)&deviceWordTopics,        chunkNumTokens*sizeof(short));
 
-    cudaMalloc((void**)&deviceWordPerplexity,    numWords*(TrainBlockSize/32)*sizeof(double));
-    cudaMalloc((void**)&deviceWordPerplexityMid, ReduceParameter*sizeof(double));
+    hipMalloc((void**)&deviceWordPerplexity,    numWords*(TrainBlockSize/32)*sizeof(double));
+    hipMalloc((void**)&deviceWordPerplexityMid, ReduceParameter*sizeof(double));
 
-    gpuErr(cudaPeekAtLastError());
+    gpuErr(hipPeekAtLastError());
 
-    cudaMalloc((void**)&deviceDocRevIndices,     (numDocs+1)*sizeof(long long));
-    cudaMalloc((void**)&deviceDocRevIdx,         chunkNumTokens*sizeof(TokenIdxType));
+    hipMalloc((void**)&deviceDocRevIndices,     (numDocs+1)*sizeof(long long));
+    hipMalloc((void**)&deviceDocRevIdx,         chunkNumTokens*sizeof(TokenIdxType));
 
     long long totalByte = (numWords + 1)*sizeof(long long) + 
                           chunkNumTokens*sizeof(int) +
@@ -313,55 +313,55 @@ void DocChunk::allocGPU(int GPUid)
                           chunkNumTokens*sizeof(TokenIdxType);
     printf("docChunk size:%.3f GB\n", totalByte/(1024.0*1024.0*1024.0));
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 }
 
 void DocChunk::toGPU()
 {
 
     //tokens
-    cudaMemcpy(deviceWordIndices, 
+    hipMemcpy(deviceWordIndices, 
                wordIndices, 
                sizeof(long long)*(numWords + 1), 
-               cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceSlotIdToWordId,
+               hipMemcpyHostToDevice);
+    hipMemcpy(deviceSlotIdToWordId,
                slotIdToWordId,
                sizeof(int)*numSlots,
-               cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceSlotIndices,
+               hipMemcpyHostToDevice);
+    hipMemcpy(deviceSlotIndices,
                slotIndices,
                sizeof(long long)*numSlots*2,
-               cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceWordTokens,
+               hipMemcpyHostToDevice);
+    hipMemcpy(deviceWordTokens,
                wordTokens,
                sizeof(int)*chunkNumTokens,
-               cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceWordTopics,
+               hipMemcpyHostToDevice);
+    hipMemcpy(deviceWordTopics,
                wordTopics,
                sizeof(short)*chunkNumTokens,
-               cudaMemcpyHostToDevice);
+               hipMemcpyHostToDevice);
 
 
     //doc rev data
-    cudaMemcpy(deviceDocRevIndices,
+    hipMemcpy(deviceDocRevIndices,
                docRevIndices,
                sizeof(long long)*(numDocs + 1),
-               cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceDocRevIdx,
+               hipMemcpyHostToDevice);
+    hipMemcpy(deviceDocRevIdx,
                docRevIdx,
                sizeof(TokenIdxType)*chunkNumTokens,
-               cudaMemcpyHostToDevice);
+               hipMemcpyHostToDevice);
 
 }
 
 void DocChunk::toCPU()
 {
     printf("DocChunk::toCPU() ChunkId:%d...\n", chunkId);
-    cudaMemcpy(wordTopics,
+    hipMemcpy(wordTopics,
                deviceWordTopics,
                sizeof(short)*chunkNumTokens,
-               cudaMemcpyDeviceToHost);
+               hipMemcpyDeviceToHost);
     
     printf("finished DocChunk::toCPU() ...\n");
 }

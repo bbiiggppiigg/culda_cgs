@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #ifndef _SingleChunkSingleGPU_H_
 #define _SingleChunkSingleGPU_H_
 
@@ -16,8 +17,8 @@ void static SingleChunkSingleGPU(Document &doc, Vocabulary &vocab, Argument &arg
     printf("to gpu for doc ...\n");
     doc.docChunkVec[0]->toGPU();
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     /* model phi */
     printf("Prepare model phi ...\n");
@@ -30,20 +31,20 @@ void static SingleChunkSingleGPU(Document &doc, Vocabulary &vocab, Argument &arg
 
     /* model theta */
     printf("Prepare model theta ...\n");
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     modelTheta.InitData(doc);
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     modelTheta.UpdateThetaGPU(doc);
 
     //exit(0);
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     //modelTheta.toCPU();
     //modelTheta.validTheta(doc);
@@ -53,15 +54,15 @@ void static SingleChunkSingleGPU(Document &doc, Vocabulary &vocab, Argument &arg
     
     /* prepare the randstate */
     int randStateSize = 256*20;
-    curandState *deviceRandState[MaxNumGPU];
-    cudaMalloc(&deviceRandState[0], sizeof(curandState)*randStateSize);
-    initRandState<<<randStateSize/256, 256>>>(deviceRandState[0]);
+    hiprandState *deviceRandState[MaxNumGPU];
+    hipMalloc(&deviceRandState[0], sizeof(hiprandState)*randStateSize);
+    hipLaunchKernelGGL(initRandState, dim3(randStateSize/256), dim3(256), 0, 0, deviceRandState[0]);
     
-    cudaStream_t extraStream;
-    cudaStreamCreate(&extraStream);
+    hipStream_t extraStream;
+    hipStreamCreate(&extraStream);
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     struct timespec begin, end;
     double elapsed = 0, stamp = 0;
@@ -72,7 +73,7 @@ void static SingleChunkSingleGPU(Document &doc, Vocabulary &vocab, Argument &arg
         clock_gettime(CLOCK_MONOTONIC, &begin);
 
         //numBlocks = 100;
-        LDAKernelTrain<<<doc.docChunkVec[0]->numSlots, TrainBlockSize>>>(
+        hipLaunchKernelGGL(LDAKernelTrain, dim3(doc.docChunkVec[0]->numSlots), dim3(TrainBlockSize), 0, 0, 
             arg.k,
             arg.alpha,
             arg.beta,
@@ -99,12 +100,12 @@ void static SingleChunkSingleGPU(Document &doc, Vocabulary &vocab, Argument &arg
             doc.docChunkVec[0]->deviceDocRevIndices
             );
 
-        //cudaDeviceSynchronize();
-        //gpuErr(cudaPeekAtLastError());
+        //hipDeviceSynchronize();
+        //gpuErr(hipPeekAtLastError());
 
         double logLike = LDATrainPerplexity(doc);
-        //cudaDeviceSynchronize();
-        //gpuErr(cudaPeekAtLastError());
+        //hipDeviceSynchronize();
+        //gpuErr(hipPeekAtLastError());
 
         //doc.docChunkVec[0]->toCPU();
 
@@ -117,7 +118,7 @@ void static SingleChunkSingleGPU(Document &doc, Vocabulary &vocab, Argument &arg
         //modelTheta.toCPU();
         //modelTheta.validTheta(doc);
 
-        cudaDeviceSynchronize();
+        hipDeviceSynchronize();
 
         clock_gettime(CLOCK_MONOTONIC, &end);
         stamp = end.tv_sec - begin.tv_sec;
@@ -125,34 +126,34 @@ void static SingleChunkSingleGPU(Document &doc, Vocabulary &vocab, Argument &arg
         elapsed += stamp;
 
         printf("Iteration %3d: %6.2f sec, %3.2f sec, logLikelyhood = %.8f, %5.3f M\n", ite+1,elapsed, stamp, logLike,  doc.numTokens/stamp/1000000);
-        cudaDeviceSynchronize();
-        gpuErr(cudaPeekAtLastError());
+        hipDeviceSynchronize();
+        gpuErr(hipPeekAtLastError());
 
 //        if((ite + 1)%30 == 0)sleep(120);
 
     }
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     for(int chunkId = 0; chunkId < doc.numChunks; chunkId ++)
         doc.docChunkVec[chunkId]->toCPU();
     printf("\n");
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
 
     modelTheta.toCPU();
     //modelTheta.validTheta(doc);
 
     modelPhi.MasterGPUToCPU();
-    //cudaDeviceSynchronize();
+    //hipDeviceSynchronize();
     //modelPhi.validPhi(doc);
 
     
 
-    cudaDeviceSynchronize();
-    gpuErr(cudaPeekAtLastError());
+    hipDeviceSynchronize();
+    gpuErr(hipPeekAtLastError());
     //modelPhi.savePhi("phi.data");
 }
 
